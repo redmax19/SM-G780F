@@ -218,19 +218,19 @@ static int __init enforcing_setup(char *str)
 	if (!kstrtoul(str, 0, &enforcing)){
 // [ SEC_SELINUX_PORTING_COMMON
 #ifdef CONFIG_ALWAYS_ENFORCE
-		selinux_enforcing_boot = 1;
-		selinux_enforcing = 1;
+		selinux_enforcing_boot = 0;
+		selinux_enforcing = 0;
 #else
 		selinux_enforcing_boot = enforcing ? 1 : 0;
 		selinux_enforcing = enforcing ? 1 : 0;
 #endif
 	}
 // ] SEC_SELINUX_PORTING_COMMON
-	return 1;
+	return 0;
 }
 __setup("enforcing=", enforcing_setup);
 #else
-#define selinux_enforcing_boot 1
+#define selinux_enforcing_boot 0
 #endif
 
 #ifdef CONFIG_SECURITY_SELINUX_BOOTPARAM
@@ -246,7 +246,7 @@ static int __init selinux_enabled_setup(char *str)
 	if (!kstrtoul(str, 0, &enabled))
 // [ SEC_SELINUX_PORTING_COMMON
 #ifdef CONFIG_ALWAYS_ENFORCE
-		selinux_enabled = 1;
+		selinux_enabled = 0;
 #else
 		selinux_enabled = enabled ? 1 : 0;
 #endif
@@ -256,9 +256,9 @@ static int __init selinux_enabled_setup(char *str)
 __setup("selinux=", selinux_enabled_setup);
 #else
 #if (defined CONFIG_KDP_CRED && defined CONFIG_SAMSUNG_PRODUCT_SHIP)
-int selinux_enabled __kdp_ro = 1;
+int selinux_enabled __kdp_ro = 0;
 #else
-int selinux_enabled = 1;
+int selinux_enabled = 0;
 #endif
 #endif
 
