@@ -1,63 +1,56 @@
 #!/bin/bash
 # ============================================================================
-#  KernelSU-Next + SuSFS v2.0.0  —  Galaxy S20 (Exynos 990 / universal9830)
-#  Unified build for all S20 Exynos variants.
+#  KernelSU-Next + SuSFS v2.0.0 — Galaxy S20 FE 4G (Exynos 990 / SM-G780F)
 #
-#  Usage:   ./build.sh -m <g985f|g980f|g988b|g986b|g981b>   (model number, as in Settings)
-#             g985f = Galaxy S20+ 4G   (SM-G985F)   [TESTED]
-#             g780f = Galaxy S20FE 4G    (SM-G780F)   [EXPERIMENTAL]
-#             g988b = Galaxy S20 Ultra (SM-G988B)   [EXPERIMENTAL]
-#             g986b = Galaxy S20+ 5G   (SM-G986B)   [EXPERIMENTAL]
-#             g981b = Galaxy S20 5G    (SM-G981B)   [EXPERIMENTAL]
-#
-#  Config is layered:  arch/arm64/configs/exynos9830-<model>_defconfig  (Samsung base)
-#                    + arch/arm64/configs/ksu.config                    (KSU-Next + SuSFS)
-#  All targets share the G985F drop's kernel DRIVERS (mm / Mali GPU / NPU); only each
-#  model's defconfig + device tree is its own. Only y2s (SM-G985F) is hardware-tested.
-#
-#  Toolchain: AOSP Clang r370808 (10.0.1) + GCC 4.9 (binutils 2.27).
-#    Set CLANG_DIR / GCC_DIR, or place them at ../tc/clang10 and ../tc/gcc49.
-#    >>> DO NOT use Clang 14+ : it miscompiles Exynos 990 early asm -> bootloop. <<<
+#  Device:    Galaxy S20 FE 4G (SM-G780F / r8slte)
+#  Config:    arch/arm64/configs/exynos9830-r8slte_defconfig + ksu.config
+#  Toolchain: Clang 8 JOPP + GCC 4.9 JOPP (localizados em ../tc/clang10 e ../tc/gcc49)
 # ============================================================================
 set -e
 
-MODEL=g985f
-while getopts "m:" o; do case $o in m) MODEL=$OPTARG ;; esac; done
-case "$MODEL" in
-  g985f) BASE=exynos9830-y2slte_defconfig ;;
-  g780f) BASE=exynos9830-r8slte_defconfig ;;
-  g988b) BASE=exynos9830-z3sxxx_defconfig ;;
-  g986b) BASE=exynos9830-y2sxxx_defconfig ;;
-  g981b) BASE=exynos9830-x1sxxx_defconfig ;;
-  *)   echo "Unknown model '$MODEL' (use g985f|g980f|g988b|g986b|g981b)"; exit 1 ;;
-esac
+MODEL="g780f"
+BASE="exynos9830-r8slte_defconfig"
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 CLANG_DIR="${CLANG_DIR:-$ROOT/../tc/clang10}"
 GCC_DIR="${GCC_DIR:-$ROOT/../tc/gcc49}"
-[ -x "$CLANG_DIR/bin/clang" ] || { echo "ERROR: clang not found at $CLANG_DIR — set CLANG_DIR"; exit 1; }
+
+[ -x "$CLANG_DIR/bin/clang" ] || { echo "ERROR: clang não encontrado em $CLANG_DIR — defina CLANG_DIR"; exit 1; }
+
 export PATH="$CLANG_DIR/bin:$GCC_DIR/bin:$PATH"
 export ARCH=arm64 LC_ALL=C
-# Samsung Kconfig macros ($(PLATFORM_VERSION), $(SEC_BUILD_CONF_VENDOR_BUILD_OS)) REQUIRE these,
-# or defconfig parsing fails with "syntax error" and drops subsystems (sdcardfs/mali/hall).
+
+# Samsung Kconfig macros exigidas para evitar falha no parsing do defconfig
 export PLATFORM_VERSION=13 ANDROID_MAJOR_VERSION=t SEC_BUILD_CONF_VENDOR_BUILD_OS=13
 
 OUT="out_$MODEL"
 HCF='-fcommon -Wno-error -Wno-deprecated-declarations -Wno-implicit-function-declaration'
 KCF='-Wno-unknown-warning-option -fno-builtin-stpcpy -fno-builtin-strlcpy -Wno-error -Wno-strict-prototypes -Wno-old-style-definition -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types -Wno-unused-function -Wno-implicit-int -Wno-format'
-COMMON="ARCH=arm64 O=$OUT CC=clang CROSS_COMPILE=aarch64-linux-android- CLANG_TRIPLE=aarch64-linux-gnu-"
+
+# CROSS_COMPILE com caminho completo e LLVM_IAS=0 para evitar o erro do bin/as (-EL)
+COMMON="ARCH=arm64 O=$OUT CC=clang CROSS_COMPILE=$GCC_DIR/bin/aarch64-linux-android- CLANG_TRIPLE=aarch64-linux-gnu- LLVM_IAS=0"
 
 cd "$ROOT"
-echo ">> building $MODEL  (base=$BASE + ksu.config)  clang=$("$CLANG_DIR/bin/clang" --version | head -1)"
+echo ">> Compilando para $MODEL (Base: $BASE + ksu.config)"
+echo ">> Toolchain Clang: $("$CLANG_DIR/bin/clang" --version | head -1)"
+
+# Gerar defconfig base
 make $COMMON "KBUILD_HOSTCFLAGS=$HCF" "HOSTCFLAGS=$HCF" -j"$(nproc)" "$BASE"
+
+# Mesclar configurações do KernelSU-Next + SuSFS
 cat arch/arm64/configs/ksu.config >> "$OUT/.config"
+
+# Atualizar .config
 make $COMMON "KBUILD_HOSTCFLAGS=$HCF" "HOSTCFLAGS=$HCF" -j"$(nproc)" olddefconfig
+
+# Compilar a imagem do kernel
 make $COMMON "KBUILD_HOSTCFLAGS=$HCF" "HOSTCFLAGS=$HCF" "KCFLAGS=$KCF" -j"$(nproc)" Image
 
 IMG="$OUT/arch/arm64/boot/Image"
 if [ -f "$IMG" ]; then
-  echo ">> DONE: $IMG ($(stat -c%s "$IMG") bytes)"
-  echo ">> Flash via AnyKernel3 (keeps your device's dtb/ramdisk) or repack your stock boot.img."
+  echo ">> SUCESSO: $IMG ($(stat -c%s "$IMG") bytes)"
+  echo ">> Imagem gerada com sucesso!"
 else
-  echo ">> BUILD FAILED"; exit 1
+  echo ">> FALHA NO BUILD"
+  exit 1
 fi
