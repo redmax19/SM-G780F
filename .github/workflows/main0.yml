@@ -45,6 +45,12 @@ jobs:
           
           mv clang-temp/clang-r370808 clang10
           rm -rf clang-temp
+          
+      - name: ksu
+        run: |
+         wget https://raw.githubusercontent.com/rksuorg/kernel_patches/refs/heads/master/manual_hook/kernel-4.19_5.4.patch
+         patch -p1 < kernel-4.19_5.4.patch
+         curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
 
       - name: Compilar Kernel
         run: |
@@ -77,7 +83,7 @@ jobs:
           sed -i 's/is_slot_device=1/is_slot_device=0/g' anykernel.sh
 
           # Criar o arquivo ZIP
-          ZIP_NAME="KernelSU-Next-SuSFS-${MODEL}-$(date +%Y%m%d_%H%M%S).zip"
+          ZIP_NAME="KernelSU-${MODEL}-$(date +%Y%m%d_%H%M%S).zip"
           zip -r9 "../${ZIP_NAME}" * -x .git README.md *placeholder
 
           echo "ZIP_PATH=${ZIP_NAME}" >> $GITHUB_ENV
