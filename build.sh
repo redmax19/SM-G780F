@@ -1,10 +1,6 @@
 #!/bin/bash
 # ============================================================================
 #  KernelSU-Next + SuSFS v2.0.0 — Galaxy S20 FE 4G (Exynos 990 / SM-G780F)
-#
-#  Device:    Galaxy S20 FE 4G (SM-G780F / r8slte)
-#  Config:    arch/arm64/configs/exynos9830-r8slte_defconfig + ksu.config
-#  Toolchain: Clang 8 JOPP + GCC 4.9 JOPP (localizados em ../tc/clang10 e ../tc/gcc49)
 # ============================================================================
 set -e
 
@@ -17,6 +13,7 @@ GCC_DIR="${GCC_DIR:-$ROOT/../tc/gcc49}"
 
 [ -x "$CLANG_DIR/bin/clang" ] || { echo "ERROR: clang não encontrado em $CLANG_DIR — defina CLANG_DIR"; exit 1; }
 
+# Garante que as pastas de binários do Clang e GCC estejam no topo do PATH
 export PATH="$CLANG_DIR/bin:$GCC_DIR/bin:$PATH"
 export ARCH=arm64 LC_ALL=C
 
@@ -27,8 +24,13 @@ OUT="out_$MODEL"
 HCF='-fcommon -Wno-error -Wno-deprecated-declarations -Wno-implicit-function-declaration'
 KCF='-Wno-unknown-warning-option -fno-builtin-stpcpy -fno-builtin-strlcpy -Wno-error -Wno-strict-prototypes -Wno-old-style-definition -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types -Wno-unused-function -Wno-implicit-int -Wno-format'
 
-# CROSS_COMPILE com caminho completo e LLVM_IAS=0 para evitar o erro do bin/as (-EL)
-COMMON="ARCH=arm64 O=$OUT CC=clang CROSS_COMPILE=$GCC_DIR/bin/aarch64-linux-android- CLANG_TRIPLE=aarch64-linux-gnu- LLVM_IAS=0"
+# Definição estrita das flags para o Clang 8 encontrar o assembler (as) do GCC
+COMMON="ARCH=arm64 O=$OUT CC=clang \
+CROSS_COMPILE=aarch64-linux-android- \
+CLANG_TRIPLE=aarch64-linux-gnu- \
+CLANG_TARGET_TRIPLE=aarch64-linux-gnu \
+GCC_TOOLCHAIN=$GCC_DIR \
+LLVM_IAS=0"
 
 cd "$ROOT"
 echo ">> Compilando para $MODEL (Base: $BASE + ksu.config)"
