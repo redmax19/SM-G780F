@@ -10,11 +10,11 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout do Código Fonte
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Instalar Dependências do Sistema
         run: |
