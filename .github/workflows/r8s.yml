@@ -14,32 +14,36 @@ jobs:
 
     steps:
       - name: Checkout do Código Fonte
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Instalar Dependências do Sistema
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential bc libncurses5-dev libssl-dev \
-            flex bison libelf-dev git ccache zip unzip bzip2
+            flex bison libelf-dev git ccache zip unzip bzip2 libtinfo5
 
       - name: Configurar Python 2 para scripts RKP
         run: |
           sudo apt-get update
-          sudo apt-get install -y python2
-          sudo update-alternatives --install /usr/bin/python python /usr/bin/python2 1
-          python --version
+          sudo apt-get install -y python2 || sudo apt-get install -y python2-minimal
+          sudo update-alternatives --install /usr/bin/python python /usr/bin/python2 1 || true
+          python2 --version
 
-      - name: Baixar e Configurar Toolchains nas pastas esperadas pelo build.sh
+      - name: Baixar e Configurar Toolchains da LineageOS
         run: |
           cd ..
           mkdir -p tc
           cd tc
 
-          echo ">> Baixando GCC 4.9 JOPP para ../tc/gcc49..."
-          git clone https://github.com/afaneh-toolchain/prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9-jopp \
-            --depth 1 gcc49
+          echo ">> Baixando GCC 4.9 LineageOS (64-bit)..."
+          git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 \
+            -b lineage-19.1 --depth 1 gcc49
 
-          echo ">> Baixando Clang 8 JOPP para ../tc/clang10..."
+          echo ">> Baixando GCC 4.9 LineageOS (32-bit)..."
+          git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 \
+            -b lineage-19.1 --depth 1 gcc32
+
+          echo ">> Baixando Clang 8 JOPP..."
           git clone https://github.com/afaneh-toolchain/prebuilts_clang_host_linux-x86_clang-r349610-jopp \
             --depth 1 clang10
 
