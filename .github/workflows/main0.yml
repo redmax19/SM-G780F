@@ -1,0 +1,90 @@
+name: Build Kernel Galaxy S20FE 2
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'Modelo do dispositivo (g780f, g985f, g980f, g988b, g986b, g981b)'
+        required: true
+        default: 'g780f'
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout do Código Fonte
+        uses: actions/checkout@v7
+
+      - name: Instalar Dependências do Sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc libncurses5-dev libssl-dev \
+            flex bison libelf-dev git ccache zip unzip bzip2
+
+      - name: Configurar Python 2 para scripts RKP
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python2
+          sudo update-alternatives --install /usr/bin/python python /usr/bin/python2 1
+          python --version
+
+      - name: Baixar e Configurar Toolchains (Clang 10 + GCC 4.9)
+        run: |
+          cd ..
+          mkdir -p tc
+          cd tc
+
+          echo ">> Baixando GCC 4.9..."
+          git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 \
+            -b android10-mainline-release --depth 1 gcc49
+
+          echo ">> Baixando Clang 10 (r370808)..."
+          git clone https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 \
+            -b android11-release --depth 1 clang-temp
+          
+          mv clang-temp/clang-r370808 clang10
+          rm -rf clang-temp
+
+      - name: Compilar Kernel
+        run: |
+          chmod +x build.sh
+          ./build.sh -m ${{ github.event.inputs.model }}
+
+      - name: Preparar e Empacotar com AnyKernel3
+        run: |
+          MODEL="${{ github.event.inputs.model }}"
+          OUT_DIR="out_${MODEL}"
+          IMG="${OUT_DIR}/arch/arm64/boot/Image"
+
+          if [ ! -f "$IMG" ]; then
+            echo "Erro: Imagem do kernel não encontrada em $IMG"
+            exit 1
+          fi
+
+          echo ">> Clonando AnyKernel3..."
+          git clone https://github.com/osm0sis/AnyKernel3.git --depth 1 AnyKernel3
+
+          echo ">> Copiando Image do kernel para AnyKernel3..."
+          cp "$IMG" AnyKernel3/
+
+          cd AnyKernel3
+
+          # Ajustar configurações do anykernel.sh para a linha S20 (Exynos 990 / universal9830)
+          sed -i 's/kernel.string=.*/kernel.string=KernelSU-Next + SuSFS kernel for Galaxy S20/g' anykernel.sh
+          sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
+          sed -i 's/block=.*/block=\/dev\/block\/bootdevice\/by-name\/boot;/g' anykernel.sh
+          sed -i 's/is_slot_device=1/is_slot_device=0/g' anykernel.sh
+
+          # Criar o arquivo ZIP
+          ZIP_NAME="KernelSU-Next-SuSFS-${MODEL}-$(date +%Y%m%d_%H%M%S).zip"
+          zip -r9 "../${ZIP_NAME}" * -x .git README.md *placeholder
+
+          echo "ZIP_PATH=${ZIP_NAME}" >> $GITHUB_ENV
+          echo ">> Arquivo ZIP criado com sucesso: ${ZIP_NAME}"
+
+      - name: Enviar Arquivo Zip Flashável (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP_PATH }}
+          path: ${{ env.ZIP_PATH }}
